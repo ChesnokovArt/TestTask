@@ -1,3 +1,11 @@
+# Temp Directories
+/.vs/
+/x64/
+
+# User's VS files
+*.filters
+*.user
+
 # Prerequisites
 *.d
 
