@@ -7,6 +7,9 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include "input.h"
+#include "camera.h"
+
 static const struct
 {
   float x, y;
@@ -21,9 +24,9 @@ static const struct
 static const char* vertex_shader_text =
 "#version 110\n"
 "uniform mat4 MVP;\n"
-"attribute vec3 vCol;\n"
-"attribute vec2 vPos;\n"
-"varying vec3 color;\n"
+"in vec3 vCol;\n"
+"in vec2 vPos;\n"
+"out vec3 color;\n"
 "void main()\n"
 "{\n"
 "    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
@@ -32,7 +35,7 @@ static const char* vertex_shader_text =
 
 static const char* fragment_shader_text =
 "#version 110\n"
-"varying vec3 color;\n"
+"in vec3 color;\n"
 "void main()\n"
 "{\n"
 "    gl_FragColor = vec4(color, 1.0);\n"
@@ -54,7 +57,7 @@ int main() {
     return -1;
   }
 
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
   GLFWwindow* window = glfwCreateWindow(1280, 720, "TestTask", NULL, NULL);
@@ -63,6 +66,8 @@ int main() {
     glfwTerminate();
     return -2;
   }
+
+  Input::Init(window);
 
   glfwSetKeyCallback(window, key_callback);
   glfwMakeContextCurrent(window);
@@ -100,6 +105,8 @@ int main() {
   glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
     sizeof(vertices[0]), (void*)(sizeof(float) * 2));
 
+  Camera cam;
+
   while (!glfwWindowShouldClose(window))
   {
     float ratio;
@@ -108,14 +115,18 @@ int main() {
 
     glfwGetFramebufferSize(window, &width, &height);
     ratio = width / (float)height;
+    cam.SetViewportSize(width, height);
 
     glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    m = glm::rotate(glm::identity<glm::mat4>(), (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, -1.0f));
+    /*m = glm::rotate(glm::identity<glm::mat4>(), (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, -1.0f));
     //mat4x4_rotate_Z(m, m, (float)glfwGetTime());
     p = glm::ortho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-    mvp = m * p;
+    mvp = m * p;*/
+
+    mvp = cam.GetViewProjection();
+    cam.OnUpdate(1 / 60.0);
 
     glUseProgram(program);
     glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*)&mvp);
