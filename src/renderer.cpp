@@ -21,7 +21,7 @@ static const char* fragment_shader_text =
 "#version 430\n"
 "in vec3 color;\n"
 "uniform int Pass;\n"
-"uniform float Weight[5];\n"
+"uniform float Weight[7];\n"
 "uniform float focal_distance = 8.0;\n"
 "uniform float focal_range = 10.0;\n"
 "layout(binding = 0) uniform sampler2D Texture0;\n"
@@ -46,6 +46,10 @@ static const char* fragment_shader_text =
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, -3)) * Weight[3];\n"
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, 4)) * Weight[4];\n"
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, -4)) * Weight[4];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, 5)) * Weight[5];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, -5)) * Weight[5];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, 6)) * Weight[6];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, -6)) * Weight[6];\n"
     "return sum;\n"
 "}\n"
 
@@ -60,9 +64,12 @@ static const char* fragment_shader_text =
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-3, 0)) * Weight[3];\n"
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(4, 0)) * Weight[4];\n"
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-4, 0)) * Weight[4];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(5, 0)) * Weight[5];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-5, 0)) * Weight[5];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(6, 0)) * Weight[6];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-6, 0)) * Weight[6];\n"
     "vec4 fullRes = texelFetch(HighRes, pix, 0);\n"
     "return fullRes + fullRes.a * (sum - fullRes);\n"
-    "return sum;\n"
 "}\n"
 
 "void main()\n"
@@ -211,8 +218,8 @@ void Renderer::Init()
     // We don't need the program anymore.
     glDeleteProgram(sd.program);
 
-
-    //glDeleteShader(id);
+    glDeleteShader(sd.vertex_shader);
+    glDeleteShader(sd.fragment_shader);
 
     std::cout << infoLog.data();
   }
@@ -245,11 +252,9 @@ void Renderer::Init()
   glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
   // Setup FBO--------------------------------------------------------------------------------------
-  // Generate and bind the framebuffer
   glGenFramebuffers(1, &sd.renderFBO);
   glBindFramebuffer(GL_FRAMEBUFFER, sd.renderFBO);
 
-  // Create the texture object
   glGenTextures(1, &sd.renderTex);
   glBindTexture(GL_TEXTURE_2D, sd.renderTex);
   glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 1280, 720);
@@ -257,32 +262,27 @@ void Renderer::Init()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-  // Bind the texture to the FBO
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sd.renderTex, 0);
 
-  // Create the depth buffer
   GLuint depthBuf;
   glGenRenderbuffers(1, &depthBuf);
   glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 1280, 720);
 
-  // Bind the depth buffer to the FBO
   glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
     GL_RENDERBUFFER, depthBuf);
 
-  // Set the targets for the fragment output variables
   GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0 };
   glDrawBuffers(1, drawBuffers);
 
-  // Unbind the framebuffer, and revert to default framebuffer
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Generate and bind the framebuffer
   glGenFramebuffers(1, &sd.intermediateFBO);
   glBindFramebuffer(GL_FRAMEBUFFER, sd.intermediateFBO);
 
-  // Create the texture object
   glGenTextures(1, &sd.intermediateTex);
   glActiveTexture(GL_TEXTURE0);  // Use texture unit 0
   glBindTexture(GL_TEXTURE_2D, sd.intermediateTex);
@@ -290,14 +290,13 @@ void Renderer::Init()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-  // Bind the texture to the FBO
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sd.intermediateTex, 0);
 
-  // Set the targets for the fragment output variables
   glDrawBuffers(1, drawBuffers);
 
-  // Unbind the framebuffer, and revert to default framebuffer
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   //-----------------------------------------------------------------------------------------------
@@ -337,22 +336,21 @@ void Renderer::Init()
 
   glBindVertexArray(0);
 
-  float weights[5], sum, sigma2 = 20.0f;
+  float weights[7], sum, sigma2 = 8.0f;
 
   // Compute and sum the weights
   weights[0] = gauss(0, sigma2);
   sum = weights[0];
-  for (int i = 1; i < 5; i++) {
-    weights[i] = gauss(float(i/10), sigma2);
+  for (int i = 1; i < 7; i++) {
+    weights[i] = gauss(float(i)/10, sigma2);
     sum += 2 * weights[i];
   }
 
   // Normalize the weights and set the uniform
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 7; i++) {
     weights[i] = weights[i] / sum;
-    //prog.setUniform(uniName.str().c_str(), val);
   }
-  glUniform1fv(sd.weight_location, 5, weights);
+  glUniform1fv(sd.weight_location, 7, weights);
 }
 
 void Renderer::StartDOF()
@@ -399,11 +397,6 @@ void Renderer::EndDOF()
 
   glClear(GL_COLOR_BUFFER_BIT);
 
-  /*model = mat4(1.0f);
-  view = mat4(1.0f);
-  projection = mat4(1.0f);
-  setMatrices();*/
-
   // Render the full-screen quad
   glBindVertexArray(sd.fsQuad);
   glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -420,13 +413,11 @@ void Renderer::DrawBox(const glm::vec3& position, const glm::vec3& scale, const 
 {
   glBindVertexArray(sd.va);
   glm::mat4 model(1.0f);
-  //glm::mat4 model;
   model = glm::scale(model, scale);
   model = glm::translate(model, position);
   model = glm::rotate(model, rotation.x, { 1.0f, 0.0f, 0.0f });
   model = glm::rotate(model, rotation.y, { 0.0f, 1.0f, 0.0f });
   model = glm::rotate(model, rotation.z, { 0.0f, 0.0f, 1.0f });
-  
 
   glUniformMatrix4fv(sd.model_location, 1, GL_FALSE, (const GLfloat*)&model);
   glDrawArrays(GL_TRIANGLES, 0, 12 * 3);

@@ -63,7 +63,7 @@ int main() {
   gladLoadGL();
   glfwSwapInterval(1);
 
-  glClearColor(0.8f, 0.75f, 0.85f, 1.0f);
+  glClearColor(0.8f, 0.75f, 0.85f, 0.0f);
 
   Renderer::Init();
   Camera cam;
@@ -109,5 +109,5 @@ int main() {
 
 void error_callback(int error, const char* description)
 {
-  fprintf(stderr, "Error: %s\n", description);
+  std::cout << "Error: %s\n" << description;
 }
