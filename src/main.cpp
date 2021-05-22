@@ -9,37 +9,7 @@
 
 #include "input.h"
 #include "camera.h"
-
-static const struct
-{
-  float x, y;
-  float r, g, b;
-} vertices[3] =
-{
-    { -0.6f, -0.4f, 1.f, 0.f, 0.f },
-    {  0.6f, -0.4f, 0.f, 1.f, 0.f },
-    {   0.f,  0.6f, 0.f, 0.f, 1.f }
-};
-
-static const char* vertex_shader_text =
-"#version 110\n"
-"uniform mat4 MVP;\n"
-"in vec3 vCol;\n"
-"in vec2 vPos;\n"
-"out vec3 color;\n"
-"void main()\n"
-"{\n"
-"    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
-"    color = vCol;\n"
-"}\n";
-
-static const char* fragment_shader_text =
-"#version 110\n"
-"in vec3 color;\n"
-"void main()\n"
-"{\n"
-"    gl_FragColor = vec4(color, 1.0);\n"
-"}\n";
+#include "renderer.h"
 
 void error_callback(int error, const char* description);
 
@@ -74,64 +44,36 @@ int main() {
   gladLoadGL();
   glfwSwapInterval(1);
 
-  glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+  glClearColor(0.8f, 0.75f, 0.85f, 1.0f);
 
-  GLuint vertex_buffer;
-  glGenBuffers(1, &vertex_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-  GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
-  glCompileShader(vertex_shader);
-
-  GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
-  glCompileShader(fragment_shader);
-
-  GLuint program = glCreateProgram();
-  glAttachShader(program, vertex_shader);
-  glAttachShader(program, fragment_shader);
-  glLinkProgram(program);
-
-  GLint mvp_location = glGetUniformLocation(program, "MVP");
-  GLint vpos_location = glGetAttribLocation(program, "vPos");
-  GLint vcol_location = glGetAttribLocation(program, "vCol");
-
-  glEnableVertexAttribArray(vpos_location);
-  glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
-    sizeof(vertices[0]), (void*)0);
-  glEnableVertexAttribArray(vcol_location);
-  glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
-    sizeof(vertices[0]), (void*)(sizeof(float) * 2));
-
+  Renderer::Init();
   Camera cam;
+
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
 
   while (!glfwWindowShouldClose(window))
   {
     float ratio;
     int width, height;
-    glm::mat4 m, p, mvp;
+    glm::mat4 vp;
 
     glfwGetFramebufferSize(window, &width, &height);
     ratio = width / (float)height;
     cam.SetViewportSize(width, height);
 
     glViewport(0, 0, width, height);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    /*m = glm::rotate(glm::identity<glm::mat4>(), (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, -1.0f));
-    //mat4x4_rotate_Z(m, m, (float)glfwGetTime());
-    p = glm::ortho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-    mvp = m * p;*/
+    vp = cam.GetViewProjection();
 
-    mvp = cam.GetViewProjection();
     cam.OnUpdate(1 / 60.0);
 
-    glUseProgram(program);
-    glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*)&mvp);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
+    Renderer::SetVP((const GLfloat*)&vp);
+    Renderer::DrawBox({ 0.0f, 0.0f, 0.0f }, { 10.0f, 0.5f, 10.0f });
+    Renderer::DrawBox({ 0.0f, 1.25f, 0.0f }, { 2.0f, 2.0f, 2.0f });
+    Renderer::DrawBox({ 2.0f, 1.65f, 0.0f }, { 2.0f, 2.0f, 2.0f }, { (float)glfwGetTime(), 0.0f, 0.0f});
+    Renderer::DrawBox({ -2.0f, 1.65f, 0.0f }, { 2.0f, 2.0f, 2.0f }, { -(float)glfwGetTime(), 0.0f, 0.0f });
 
     glfwSwapBuffers(window);
 
