@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 16.0.31019.35
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestTask", "TestTask.vcxproj", "{E6663A3D-0BE5-4016-B441-40ED2200527B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{BDD6857C-A90D-870D-52FA-6C103E10030F} = {BDD6857C-A90D-870D-52FA-6C103E10030F}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Glad", "3rdparty\Glad\Glad.vcxproj", "{BDD6857C-A90D-870D-52FA-6C103E10030F}"
 EndProject
