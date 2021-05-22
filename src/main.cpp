@@ -27,8 +27,8 @@ int main() {
     return -1;
   }
 
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 
   GLFWwindow* window = glfwCreateWindow(1280, 720, "TestTask", NULL, NULL);
   if (!window)
@@ -63,17 +63,20 @@ int main() {
     cam.SetViewportSize(width, height);
 
     glViewport(0, 0, width, height);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    vp = cam.GetViewProjection();
+    //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     cam.OnUpdate(1 / 60.0);
+    vp = cam.GetViewProjection();
 
+    //glm::mat4 proj = glm::perspective(glm::radians(60.0f), 1.7f, 0.1f, 100.0f);
+
+    Renderer::StartDOF();
     Renderer::SetVP((const GLfloat*)&vp);
     Renderer::DrawBox({ 0.0f, 0.0f, 0.0f }, { 10.0f, 0.5f, 10.0f });
     Renderer::DrawBox({ 0.0f, 1.25f, 0.0f }, { 2.0f, 2.0f, 2.0f });
     Renderer::DrawBox({ 2.0f, 1.65f, 0.0f }, { 2.0f, 2.0f, 2.0f }, { (float)glfwGetTime(), 0.0f, 0.0f});
     Renderer::DrawBox({ -2.0f, 1.65f, 0.0f }, { 2.0f, 2.0f, 2.0f }, { -(float)glfwGetTime(), 0.0f, 0.0f });
+    Renderer::EndDOF();
 
     glfwSwapBuffers(window);
 

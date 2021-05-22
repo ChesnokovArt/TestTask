@@ -1,8 +1,10 @@
 #include "renderer.h"
 #include <glm/ext.hpp>
+#include <vector>
+#include <iostream>
 
 static const char* vertex_shader_text =
-"#version 330\n"
+"#version 430\n"
 "uniform mat4 VP;\n"
 "uniform mat4 model;\n"
 "layout(location = 0) in vec3 vPos;\n"
@@ -15,20 +17,51 @@ static const char* vertex_shader_text =
 "}\n";
 
 static const char* fragment_shader_text =
-"#version 110\n"
+"#version 430\n"
 "in vec3 color;\n"
+"uniform int Pass;\n"
+"uniform float Weight[5];\n"
+"layout(binding = 0) uniform sampler2D Texture0;\n"
+"layout(location = 0) out vec4 FragColor;\n"
+
+"vec4 pass1() {\n"
+"   return FragColor = vec4(color, 1.0);\n"
+"}\n"
+
+"vec4 pass2() {\n"
+    "ivec2 pix = ivec2(gl_FragCoord.xy);\n"
+    "vec4 sum = texelFetch(Texture0, pix, 0) * Weight[0];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, 1)) * Weight[1];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, -1)) * Weight[1];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, 2)) * Weight[2];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, -2)) * Weight[2];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, 3)) * Weight[3];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, -3)) * Weight[3];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, 4)) * Weight[4];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(0, -4)) * Weight[4];\n"
+    "return sum;\n"
+"}\n"
+
+"vec4 pass3() {\n"
+    "ivec2 pix = ivec2(gl_FragCoord.xy);\n"
+    "vec4 sum = texelFetch(Texture0, pix, 0) * Weight[0];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(1, 0)) * Weight[1];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-1, 0)) * Weight[1];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(2, 0)) * Weight[2];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-2, 0)) * Weight[2];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(3, 0)) * Weight[3];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-3, 0)) * Weight[3];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(4, 0)) * Weight[4];\n"
+    "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-4, 0)) * Weight[4];\n"
+    "return sum;\n"
+"}\n"
+
 "void main()\n"
 "{\n"
-"    gl_FragColor = vec4(color, 1.0);\n"
+    "if( Pass == 1 ) FragColor = pass1();\n"
+    "else if (Pass == 2) FragColor = pass2();\n"
+    "else if (Pass == 3) FragColor = pass3();\n"
 "}\n";
-
-struct RenderData {
-  GLuint indices[6 * 3 * 2];
-
-  GLuint box_vertex_array;
-  GLuint box_vertex_buffer;
-  GLuint shader;
-};
 
 static const GLfloat g_vertex_buffer_data[] = {
     -1.0f,-1.0f,-1.0f,
@@ -108,56 +141,269 @@ static const GLfloat g_color_buffer_data[] = {
     0.982f,  0.099f,  0.879f
 };
 
-GLuint Renderer::va;
-GLuint Renderer::vb;
-GLuint Renderer::color_buffer;
-GLuint Renderer::vertex_shader;
-GLuint Renderer::fragment_shader;
-GLuint Renderer::program;
-GLint  Renderer::vp_location;
-GLint  Renderer::model_location;
+RenderData Renderer::sd;
 
 void Renderer::Init()
 {
-  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
-  glCompileShader(vertex_shader);
+  sd.vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource(sd.vertex_shader, 1, &vertex_shader_text, NULL);
+  glCompileShader(sd.vertex_shader);
 
-  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
-  glCompileShader(fragment_shader);
+  GLint isCompiled = 0;
+  glGetShaderiv(sd.vertex_shader, GL_COMPILE_STATUS, &isCompiled);
+  if (isCompiled == GL_FALSE)
+  {
+    GLint maxLength = 0;
+    glGetShaderiv(sd.vertex_shader, GL_INFO_LOG_LENGTH, &maxLength);
 
-  program = glCreateProgram();
-  glAttachShader(program, vertex_shader);
-  glAttachShader(program, fragment_shader);
-  glLinkProgram(program);
+    std::vector<GLchar> infoLog(maxLength);
+    glGetShaderInfoLog(sd.vertex_shader, maxLength, &maxLength, &infoLog[0]);
 
-  glUseProgram(program);
+    glDeleteShader(sd.vertex_shader);
 
-  vp_location = glGetUniformLocation(program, "VP");
-  model_location = glGetUniformLocation(program, "model");
+    std::cout << infoLog.data();
+  }
 
-  glGenVertexArrays(1, &va);
-  glBindVertexArray(va);
+  sd.fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(sd.fragment_shader, 1, &fragment_shader_text, NULL);
+  glCompileShader(sd.fragment_shader);
 
-  glGenBuffers(1, &vb);
-  glBindBuffer(GL_ARRAY_BUFFER, vb);
+  isCompiled = 0;
+  glGetShaderiv(sd.fragment_shader, GL_COMPILE_STATUS, &isCompiled);
+  if (isCompiled == GL_FALSE)
+  {
+    GLint maxLength = 0;
+    glGetShaderiv(sd.fragment_shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+    std::vector<GLchar> infoLog(maxLength);
+    glGetShaderInfoLog(sd.fragment_shader, maxLength, &maxLength, &infoLog[0]);
+
+    glDeleteShader(sd.fragment_shader);
+
+    std::cout << infoLog.data();
+  }
+
+  sd.program = glCreateProgram();
+  glAttachShader(sd.program, sd.vertex_shader);
+  glAttachShader(sd.program, sd.fragment_shader);
+  glLinkProgram(sd.program);
+
+  GLint isLinked = 0;
+  glGetProgramiv(sd.program, GL_LINK_STATUS, (int*)&isLinked);
+  if (isLinked == GL_FALSE)
+  {
+    GLint maxLength = 0;
+    glGetProgramiv(sd.program, GL_INFO_LOG_LENGTH, &maxLength);
+
+    // The maxLength includes the NULL character
+    std::vector<GLchar> infoLog(maxLength);
+    glGetProgramInfoLog(sd.program, maxLength, &maxLength, &infoLog[0]);
+
+    // We don't need the program anymore.
+    glDeleteProgram(sd.program);
+
+
+    //glDeleteShader(id);
+
+    std::cout << infoLog.data();
+  }
+  glUseProgram(sd.program);
+
+  sd.vp_location = glGetUniformLocation(sd.program, "VP");
+  sd.model_location = glGetUniformLocation(sd.program, "model");
+  sd.pass_location = glGetUniformLocation(sd.program, "Pass");
+  sd.weight_location = glGetUniformLocation(sd.program, "Weight");
+
+  glGenVertexArrays(1, &sd.va);
+  glBindVertexArray(sd.va);
+
+  glGenBuffers(1, &sd.vb);
+  glBindBuffer(GL_ARRAY_BUFFER, sd.vb);
   glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
-  glGenBuffers(1, &color_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, color_buffer);
+  glGenBuffers(1, &sd.color_buffer);
+  glBindBuffer(GL_ARRAY_BUFFER, sd.color_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(g_color_buffer_data), g_color_buffer_data, GL_STATIC_DRAW);
 
   glEnableVertexAttribArray(1);
-  glBindBuffer(GL_ARRAY_BUFFER, color_buffer);
+  glBindBuffer(GL_ARRAY_BUFFER, sd.color_buffer);
   glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+  // Setup FBO--------------------------------------------------------------------------------------
+  // Generate and bind the framebuffer
+  glGenFramebuffers(1, &sd.renderFBO);
+  glBindFramebuffer(GL_FRAMEBUFFER, sd.renderFBO);
+
+  // Create the texture object
+  glGenTextures(1, &sd.renderTex);
+  glBindTexture(GL_TEXTURE_2D, sd.renderTex);
+  glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 1280, 720);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+  // Bind the texture to the FBO
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sd.renderTex, 0);
+
+  // Create the depth buffer
+  GLuint depthBuf;
+  glGenRenderbuffers(1, &depthBuf);
+  glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 1280, 720);
+
+  // Bind the depth buffer to the FBO
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+    GL_RENDERBUFFER, depthBuf);
+
+  // Set the targets for the fragment output variables
+  GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0 };
+  glDrawBuffers(1, drawBuffers);
+
+  // Unbind the framebuffer, and revert to default framebuffer
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  // Generate and bind the framebuffer
+  glGenFramebuffers(1, &sd.intermediateFBO);
+  glBindFramebuffer(GL_FRAMEBUFFER, sd.intermediateFBO);
+
+  // Create the texture object
+  glGenTextures(1, &sd.intermediateTex);
+  glActiveTexture(GL_TEXTURE0);  // Use texture unit 0
+  glBindTexture(GL_TEXTURE_2D, sd.intermediateTex);
+  glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 1280, 720);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+  // Bind the texture to the FBO
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sd.intermediateTex, 0);
+
+  // Set the targets for the fragment output variables
+  glDrawBuffers(1, drawBuffers);
+
+  // Unbind the framebuffer, and revert to default framebuffer
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  //-----------------------------------------------------------------------------------------------
+  // Array for full-screen quad
+  GLfloat verts[] = {
+      -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+      -1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f
+  };
+  GLfloat tc[] = {
+      0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+      0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f
+  };
+
+  // Set up the buffers
+
+  GLuint handle[2];
+  glGenBuffers(2, handle);
+
+  glBindBuffer(GL_ARRAY_BUFFER, handle[0]);
+  glBufferData(GL_ARRAY_BUFFER, 6 * 3 * sizeof(float), verts, GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ARRAY_BUFFER, handle[1]);
+  glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), tc, GL_STATIC_DRAW);
+
+  // Set up the vertex array object
+
+  glGenVertexArrays(1, &sd.fsQuad);
+  glBindVertexArray(sd.fsQuad);
+
+  glBindBuffer(GL_ARRAY_BUFFER, handle[0]);
+  glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, ((GLubyte*)NULL + (0)));
+  glEnableVertexAttribArray(0);  // Vertex position
+
+  glBindBuffer(GL_ARRAY_BUFFER, handle[1]);
+  glVertexAttribPointer((GLuint)2, 2, GL_FLOAT, GL_FALSE, 0, ((GLubyte*)NULL + (0)));
+  glEnableVertexAttribArray(2);  // Texture coordinates
+
+  glBindVertexArray(0);
+
+  float weights[5], sum, sigma2 = 20.0f;
+
+  // Compute and sum the weights
+  weights[0] = gauss(0, sigma2);
+  sum = weights[0];
+  for (int i = 1; i < 5; i++) {
+    weights[i] = gauss(float(i/10), sigma2);
+    sum += 2 * weights[i];
+  }
+
+  // Normalize the weights and set the uniform
+  for (int i = 0; i < 5; i++) {
+    weights[i] = weights[i] / sum;
+    //prog.setUniform(uniName.str().c_str(), val);
+  }
+  glUniform1fv(sd.weight_location, 5, weights);
+}
+
+void Renderer::StartDOF()
+{
+  glUniform1i(sd.pass_location, 1);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, sd.renderFBO);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::EndDOF()
+{
+  // Pass 2
+  glUniform1i(sd.pass_location, 2);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, sd.intermediateFBO);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, sd.renderTex);
+
+  glDisable(GL_DEPTH_TEST);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  glm::mat4 ident = glm::identity<glm::mat4>();
+
+  glUniformMatrix4fv(sd.vp_location, 1, GL_FALSE, (const GLfloat*)&ident);
+  glUniformMatrix4fv(sd.model_location, 1, GL_FALSE, (const GLfloat*)&ident);
+
+  // Render the full-screen quad
+  glBindVertexArray(sd.fsQuad);
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+
+  // Pass 3
+  glUniform1i(sd.pass_location, 3);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, sd.intermediateTex);
+
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  /*model = mat4(1.0f);
+  view = mat4(1.0f);
+  projection = mat4(1.0f);
+  setMatrices();*/
+
+  // Render the full-screen quad
+  glBindVertexArray(sd.fsQuad);
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+float Renderer::gauss(float x, float sigma2)
+{
+  double coeff = 1.0 / (glm::two_pi<double>() * sigma2);
+  double expon = -(x * x) / (2.0 * sigma2);
+  return (float)(coeff * exp(expon));
 }
 
 void Renderer::DrawBox(const glm::vec3& position, const glm::vec3& scale, const glm::vec3& rotation)
 {
+  glBindVertexArray(sd.va);
   glm::mat4 model(1.0f);
   //glm::mat4 model;
   model = glm::scale(model, scale);
@@ -167,7 +413,7 @@ void Renderer::DrawBox(const glm::vec3& position, const glm::vec3& scale, const 
   model = glm::rotate(model, rotation.z, { 0.0f, 0.0f, 1.0f });
   
 
-  glUniformMatrix4fv(model_location, 1, GL_FALSE, (const GLfloat*)&model);
+  glUniformMatrix4fv(sd.model_location, 1, GL_FALSE, (const GLfloat*)&model);
   glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
 }
 
