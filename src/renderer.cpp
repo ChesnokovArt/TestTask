@@ -5,14 +5,15 @@
 
 static const char* vertex_shader_text =
 "#version 430\n"
-"uniform mat4 VP;\n"
+"uniform mat4 view;\n"
+"uniform mat4 proj;\n"
 "uniform mat4 model;\n"
 "layout(location = 0) in vec3 vPos;\n"
 "layout(location = 1) in vec3 vCol;\n"
 "out vec3 color;\n"
 "void main()\n"
 "{\n"
-"    gl_Position = VP * model * vec4(vPos, 1.0);\n"
+"    gl_Position = proj * view * model * vec4(vPos, 1.0);\n"
 "    color = vCol;\n"
 "}\n";
 
@@ -21,11 +22,17 @@ static const char* fragment_shader_text =
 "in vec3 color;\n"
 "uniform int Pass;\n"
 "uniform float Weight[5];\n"
+"uniform float focal_distance = 8.0;\n"
+"uniform float focal_range = 10.0;\n"
 "layout(binding = 0) uniform sampler2D Texture0;\n"
+"layout(binding = 1) uniform sampler2D HighRes;\n"
 "layout(location = 0) out vec4 FragColor;\n"
 
 "vec4 pass1() {\n"
-"   return FragColor = vec4(color, 1.0);\n"
+"   //return FragColor = vec4(color, 1.0);\n"
+"   float Z = gl_FragCoord.z / gl_FragCoord.w;\n"
+"   float blur = clamp(abs(Z - focal_distance) / focal_range, 0.0, 1.0);\n"
+"   return FragColor = vec4(color, blur);\n"
 "}\n"
 
 "vec4 pass2() {\n"
@@ -53,6 +60,8 @@ static const char* fragment_shader_text =
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-3, 0)) * Weight[3];\n"
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(4, 0)) * Weight[4];\n"
     "sum += texelFetchOffset(Texture0, pix, 0, ivec2(-4, 0)) * Weight[4];\n"
+    "vec4 fullRes = texelFetch(HighRes, pix, 0);\n"
+    "return fullRes + fullRes.a * (sum - fullRes);\n"
     "return sum;\n"
 "}\n"
 
@@ -209,10 +218,13 @@ void Renderer::Init()
   }
   glUseProgram(sd.program);
 
-  sd.vp_location = glGetUniformLocation(sd.program, "VP");
+  sd.view_location = glGetUniformLocation(sd.program, "view");
+  sd.proj_location = glGetUniformLocation(sd.program, "proj");
   sd.model_location = glGetUniformLocation(sd.program, "model");
   sd.pass_location = glGetUniformLocation(sd.program, "Pass");
   sd.weight_location = glGetUniformLocation(sd.program, "Weight");
+  sd.focal_dist_loc = glGetUniformLocation(sd.program, "focal_distance");
+  sd.focal_range_loc = glGetUniformLocation(sd.program, "focal_range"); 
 
   glGenVertexArrays(1, &sd.va);
   glBindVertexArray(sd.va);
@@ -367,7 +379,8 @@ void Renderer::EndDOF()
 
   glm::mat4 ident = glm::identity<glm::mat4>();
 
-  glUniformMatrix4fv(sd.vp_location, 1, GL_FALSE, (const GLfloat*)&ident);
+  glUniformMatrix4fv(sd.view_location, 1, GL_FALSE, (const GLfloat*)&ident);
+  glUniformMatrix4fv(sd.proj_location, 1, GL_FALSE, (const GLfloat*)&ident);
   glUniformMatrix4fv(sd.model_location, 1, GL_FALSE, (const GLfloat*)&ident);
 
   // Render the full-screen quad
@@ -381,6 +394,8 @@ void Renderer::EndDOF()
 
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, sd.intermediateTex);
+  glActiveTexture(GL_TEXTURE1);
+  glBindTexture(GL_TEXTURE_2D, sd.renderTex);
 
   glClear(GL_COLOR_BUFFER_BIT);
 

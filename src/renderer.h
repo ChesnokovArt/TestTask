@@ -11,7 +11,8 @@ public:
   GLuint vertex_shader;
   GLuint fragment_shader;
   GLuint program;
-  GLint vp_location;
+  GLint view_location;
+  GLint proj_location;
   GLint model_location;
 
   GLuint fsQuad;
@@ -19,6 +20,9 @@ public:
   GLuint weight_location;
   GLuint renderFBO, intermediateFBO;
   GLuint renderTex, intermediateTex;
+
+  GLuint focal_dist_loc;
+  GLuint focal_range_loc;
 };
 
 class Renderer
@@ -31,8 +35,17 @@ public:
   static void EndDOF();
   static void DrawBox(const glm::vec3& position = { 0.0f, 0.0f, 0.0f }, const glm::vec3& scale = {1.0f, 1.0f, 1.0f},
     const glm::vec3& rotation = { 0.0f, 0.0f, 0.0f });
-  static void SetVP(const GLfloat* mat) {
-    glUniformMatrix4fv(sd.vp_location, 1, GL_FALSE, mat);
+  static void SetView(const GLfloat* mat) {
+    glUniformMatrix4fv(sd.view_location, 1, GL_FALSE, mat);
+  }
+  static void SetProjection(const GLfloat* mat) {
+    glUniformMatrix4fv(sd.proj_location, 1, GL_FALSE, mat);
+  }
+  static void SetFocalDistance(float dist) {
+    glUniform1f(sd.focal_dist_loc, dist);
+  }
+  static void SetFocalRange(float range) {
+    glUniform1f(sd.focal_range_loc, range);
   }
 
 private:

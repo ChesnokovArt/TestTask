@@ -13,10 +13,29 @@
 
 void error_callback(int error, const char* description);
 
+float focal_dist = 8.0f;
+float focal_range = 10.0f;
+
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
     glfwSetWindowShouldClose(window, GLFW_TRUE);
+  if (key == GLFW_KEY_UP && action == GLFW_REPEAT) {
+    focal_dist += 0.2f;
+    Renderer::SetFocalDistance(focal_dist);
+  } else if (key == GLFW_KEY_DOWN && action == GLFW_REPEAT) {
+    focal_dist -= 0.2f;
+    Renderer::SetFocalDistance(focal_dist);
+  }
+
+  if (key == GLFW_KEY_LEFT && action == GLFW_REPEAT) {
+    focal_range -= 0.2f;
+    Renderer::SetFocalRange(focal_range);
+  }
+  else if (key == GLFW_KEY_RIGHT && action == GLFW_REPEAT) {
+    focal_range += 0.2f;
+    Renderer::SetFocalRange(focal_range);
+  }
 }
 
 int main() {
@@ -56,26 +75,26 @@ int main() {
   {
     float ratio;
     int width, height;
-    glm::mat4 vp;
+    glm::mat4 v, p;
 
     glfwGetFramebufferSize(window, &width, &height);
     ratio = width / (float)height;
     cam.SetViewportSize(width, height);
 
     glViewport(0, 0, width, height);
-    //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     cam.OnUpdate(1 / 60.0);
-    vp = cam.GetViewProjection();
+    v = cam.GetViewMatrix();
+    p = cam.GetProjection();
 
-    //glm::mat4 proj = glm::perspective(glm::radians(60.0f), 1.7f, 0.1f, 100.0f);
 
     Renderer::StartDOF();
-    Renderer::SetVP((const GLfloat*)&vp);
+    Renderer::SetView((const GLfloat*)&v);
+    Renderer::SetProjection((const GLfloat*)&p);
     Renderer::DrawBox({ 0.0f, 0.0f, 0.0f }, { 10.0f, 0.5f, 10.0f });
     Renderer::DrawBox({ 0.0f, 1.25f, 0.0f }, { 2.0f, 2.0f, 2.0f });
-    Renderer::DrawBox({ 2.0f, 1.65f, 0.0f }, { 2.0f, 2.0f, 2.0f }, { (float)glfwGetTime(), 0.0f, 0.0f});
-    Renderer::DrawBox({ -2.0f, 1.65f, 0.0f }, { 2.0f, 2.0f, 2.0f }, { -(float)glfwGetTime(), 0.0f, 0.0f });
+    Renderer::DrawBox({ 5.0f, 1.65f, 0.0f }, { 2.0f, 2.0f, 2.0f }, { (float)glfwGetTime() / 10.0f, 0.0f, 0.0f});
+    Renderer::DrawBox({ -5.0f, 1.65f, 0.0f }, { 2.0f, 2.0f, 2.0f }, { -(float)glfwGetTime() / 10.0f, 0.0f, 0.0f });
     Renderer::EndDOF();
 
     glfwSwapBuffers(window);
